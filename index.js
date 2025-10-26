@@ -5,6 +5,10 @@ import cors from "cors";
 import authRoutes from "./routes/auth.js";
 import profileRoutes from "./routes/profiles.js";
 import postRoutes from "./routes/posts.js";
+import likeRoutes from "./routes/likes.js";
+import commentRoutes from "./routes/comments.js";
+import shareRoutes from "./routes/shares.js";
+
 try {
   const authRoutes = await import("./routes/auth.js");
   console.log("✅ auth.js loaded");

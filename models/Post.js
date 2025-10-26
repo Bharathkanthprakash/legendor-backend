@@ -18,25 +18,30 @@ const postSchema = new mongoose.Schema({
     enum: ['image', 'video', null],
     default: null
   },
-  likes: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  comments: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    text: {
-      type: String,
-      required: true
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
-  }]
+  
+  // UPDATED: Simplified engagement fields - remove the nested arrays
+  likesCount: { 
+    type: Number, 
+    default: 0 
+  },
+  commentsCount: { 
+    type: Number, 
+    default: 0 
+  },
+  sharesCount: { 
+    type: Number, 
+    default: 0 
+  },
+  
+  // For shared posts
+  originalPost: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Post' 
+  },
+  isShare: { 
+    type: Boolean, 
+    default: false 
+  }
 }, {
   timestamps: true
 });

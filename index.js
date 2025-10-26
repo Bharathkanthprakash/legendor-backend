@@ -9,14 +9,6 @@ import likeRoutes from "./routes/likes.js";
 import commentRoutes from "./routes/comments.js";
 import shareRoutes from "./routes/shares.js";
 
-try {
-  const authRoutes = await import("./routes/auth.js");
-  console.log("✅ auth.js loaded");
-} catch (e) {
-  console.log("❌ auth.js failed to load:", e.message);
-}
-
-
 dotenv.config();
 const app = express();
 
@@ -56,8 +48,7 @@ app.get("/health", (req, res) => {
     service: "legendor-backend",
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
-     database: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected"
-  });
+    database: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected"
   });
 });
 
@@ -70,9 +61,9 @@ app.get("/", (req, res) => {
       auth: "/api/auth",
       profiles: "/api/profiles",
       posts: "/api/posts",
-       likes: "/api/posts/:postId/like",
+      likes: "/api/posts/:postId/like",
       comments: "/api/posts/:postId/comments",
-      shares: "/api/shares"/:postId/comments"
+      shares: "/api/shares"
     }
   });
 });
@@ -85,5 +76,5 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`✅ Health endpoint: http://0.0.0.0:${PORT}/health`);
-   console.log(`✅ MongoDB: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
+  console.log(`✅ MongoDB: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
 });

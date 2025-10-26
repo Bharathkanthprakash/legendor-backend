@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "build": "echo 'No build step required'"
+    "build": "echo 'No build step for Node.js'",
+    "test": "jest",
+    "lint": "eslint .",
+    "seed": "node scripts/seed.js"
   },
   "dependencies": {
     "express": "^4.19.2",

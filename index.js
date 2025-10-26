@@ -24,6 +24,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://192.168.29.77:5173',
+    'https://legendor.netlify.app',
     'https://legendor-frontend.netlify.app',
     'https://legendor-frontend1.netlify.app',
     'https://legendor.in',

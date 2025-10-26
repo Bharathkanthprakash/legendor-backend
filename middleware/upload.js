@@ -3,14 +3,14 @@ import path from "path";
 import fs from "fs";
 import { v2 as cloudinary } from 'cloudinary';
 
-// Cloudinary configuration
+// Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Ensure upload directories exist
+// Ensure local upload directories exist (fallback)
 const ensureDirectories = () => {
   const dirs = ['uploads', 'uploads/posts', 'uploads/profile-pics', 'uploads/stories'];
   dirs.forEach(dir => {
@@ -22,7 +22,7 @@ const ensureDirectories = () => {
 
 ensureDirectories();
 
-// Storage configuration
+// Storage configuration for local (fallback)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let folder = 'uploads/';
@@ -80,28 +80,62 @@ const uploadProfile = multer({
 
 // Middlewares
 const uploadSingle = upload.single('media');
-const uploadMultiple = upload.array('media', 10); // Max 10 files
+const uploadMultiple = upload.array('media', 10);
 const uploadProfilePicture = uploadProfile.single('profilePicture');
 
-// Cloudinary upload helper
+// Cloudinary upload function
 const uploadToCloudinary = async (filePath, folder = 'legendor') => {
   try {
+    console.log(`📤 Uploading to Cloudinary folder: ${folder}`);
+    
     const result = await cloudinary.uploader.upload(filePath, {
-      folder: folder,
-      resource_type: 'auto'
+      folder: `legendor/${folder}`,
+      resource_type: 'auto',
+      quality: 'auto',
+      fetch_format: 'auto'
     });
     
-    // Delete local file after upload
+    // Delete local file after successful upload
     fs.unlinkSync(filePath);
     
-    return result;
+    console.log(`✅ Cloudinary upload successful: ${result.secure_url}`);
+    
+    return {
+      url: result.secure_url,
+      public_id: result.public_id,
+      format: result.format,
+      bytes: result.bytes
+    };
+    
   } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    throw new Error('File upload failed');
+    console.error('❌ Cloudinary upload error:', error);
+    
+    // Fallback: return local path if Cloudinary fails
+    const localUrl = `/${filePath.replace(/\\/g, '/')}`;
+    console.log(`🔄 Falling back to local storage: ${localUrl}`);
+    
+    return {
+      url: localUrl,
+      public_id: null,
+      format: path.extname(filePath).replace('.', ''),
+      bytes: fs.statSync(filePath).size
+    };
   }
 };
 
-// Error handling
+// Delete from Cloudinary
+const deleteFromCloudinary = async (publicId) => {
+  try {
+    if (publicId) {
+      await cloudinary.uploader.destroy(publicId);
+      console.log(`✅ Deleted from Cloudinary: ${publicId}`);
+    }
+  } catch (error) {
+    console.error('❌ Cloudinary delete error:', error);
+  }
+};
+
+// Error handling middleware
 const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
@@ -127,5 +161,6 @@ export {
   uploadMultiple,
   uploadProfilePicture,
   handleUploadError,
-  uploadToCloudinary
+  uploadToCloudinary,
+  deleteFromCloudinary
 };

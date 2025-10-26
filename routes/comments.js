@@ -1,11 +1,12 @@
-const express = require('express');
+import express from "express";
+import Comment from "../models/Comment.js";
+import Post from "../models/Post.js";
+import auth from "../middleware/auth.js";
+
 const router = express.Router();
-const Comment = require('../models/Comment');
-const Post = require('../models/Post');
-const auth = require('../middleware/auth');
 
 // Add comment to post
-router.post('/:postId/comments', auth, async (req, res) => {
+router.post("/:postId/comments", auth, async (req, res) => {
   try {
     const { text } = req.body;
     
@@ -16,7 +17,7 @@ router.post('/:postId/comments', auth, async (req, res) => {
     });
     
     await comment.save();
-    await comment.populate('user', 'name username profilePicture');
+    await comment.populate("user", "name username profilePicture");
     
     await Post.findByIdAndUpdate(req.params.postId, { $inc: { commentsCount: 1 } });
     
@@ -27,10 +28,10 @@ router.post('/:postId/comments', auth, async (req, res) => {
 });
 
 // Get comments for a post
-router.get('/:postId/comments', async (req, res) => {
+router.get("/:postId/comments", async (req, res) => {
   try {
     const comments = await Comment.find({ post: req.params.postId })
-      .populate('user', 'name username profilePicture')
+      .populate("user", "name username profilePicture")
       .sort({ createdAt: -1 });
     
     res.json(comments);
@@ -40,26 +41,25 @@ router.get('/:postId/comments', async (req, res) => {
 });
 
 // Delete a comment
-router.delete('/comments/:commentId', auth, async (req, res) => {
+router.delete("/comments/:commentId", auth, async (req, res) => {
   try {
     const comment = await Comment.findById(req.params.commentId);
     
     if (!comment) {
-      return res.status(404).json({ error: 'Comment not found' });
+      return res.status(404).json({ error: "Comment not found" });
     }
     
-    // Check if user owns the comment
     if (comment.user.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to delete this comment' });
+      return res.status(403).json({ error: "Not authorized to delete this comment" });
     }
     
     await Comment.findByIdAndDelete(req.params.commentId);
     await Post.findByIdAndUpdate(comment.post, { $inc: { commentsCount: -1 } });
     
-    res.json({ message: 'Comment deleted' });
+    res.json({ message: "Comment deleted" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-module.exports = router;
+export default router;

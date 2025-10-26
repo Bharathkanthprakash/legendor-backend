@@ -1,41 +1,78 @@
 import express from "express";
-import jwt from "jsonwebtoken";
-import Profile from "../models/Profile.js";
+import User from "../models/User.js";
+import auth from "../middleware/auth.js";
+import { uploadProfilePicture, handleUploadError } from "../middleware/upload.js";
 
 const router = express.Router();
 
-const verifyToken = (req, res, next) => {
-  const header = req.headers["authorization"];
-  if (!header) return res.status(403).json({ message: "No token" });
-
-  const token = header.split(" ")[1];
+// Update user profile
+router.put("/", auth, async (req, res) => {
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    res.status(401).json({ message: "Invalid token" });
-  }
-};
+    const { name, username, sports, favoriteSports } = req.body;
 
-// Create or update profile
-router.post("/", verifyToken, async (req, res) => {
-  const { name, role, bio } = req.body;
-  try {
-    const profile = await Profile.findOneAndUpdate(
-      { userId: req.user.id },
-      { name, role, bio },
-      { new: true, upsert: true }
-    );
-    res.json(profile);
-  } catch {
-    res.status(500).json({ message: "Error saving profile" });
+    const user = await User.findById(req.user.id);
+
+    if (name) user.name = name;
+    if (username) user.username = username;
+    if (sports) user.sports = sports;
+    if (favoriteSports) user.favoriteSports = favoriteSports;
+
+    await user.save();
+
+    res.json({
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        profilePicture: user.profilePicture,
+        sports: user.sports,
+        favoriteSports: user.favoriteSports
+      }
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Get all profiles
-router.get("/", async (req, res) => {
-  const profiles = await Profile.find();
-  res.json(profiles);
+// Upload profile picture
+router.put("/picture", auth, uploadProfilePicture, handleUploadError, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const user = await User.findById(req.user.id);
+    user.profilePicture = `/uploads/profile-pics/${req.file.filename}`;
+    await user.save();
+
+    res.json({
+      message: "Profile picture updated successfully",
+      profilePicture: user.profilePicture
+    });
+  } catch (error) {
+    console.error("Upload profile picture error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Get user profile
+router.get("/:userId", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+      .select("-password -verificationToken -verificationExpires");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error("Get profile error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

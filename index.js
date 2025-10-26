@@ -54,7 +54,9 @@ app.get("/health", (req, res) => {
     status: "OK",
     service: "legendor-backend",
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || "development"
+    environment: process.env.NODE_ENV || "development",
+     database: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected"
+  });
   });
 });
 
@@ -69,7 +71,7 @@ app.get("/", (req, res) => {
       posts: "/api/posts",
        likes: "/api/posts/:postId/like",
       comments: "/api/posts/:postId/comments",
-      shares: "/api/shares"
+      shares: "/api/shares"/:postId/comments"
     }
   });
 });
@@ -82,4 +84,5 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`✅ Health endpoint: http://0.0.0.0:${PORT}/health`);
+   console.log(`✅ MongoDB: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
 });

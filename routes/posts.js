@@ -1,119 +1,233 @@
 import express from "express";
 import Post from "../models/Post.js";
+import User from "../models/User.js";
+import Notification from "../models/Notification.js";
 import auth from "../middleware/auth.js";
-import { uploadSingle, handleUploadError } from "../middleware/upload.js";
+import { uploadMultiple, handleUploadError } from "../middleware/upload.js";
 
 const router = express.Router();
 
-// Create a new post with file upload
-router.post("/", auth, uploadSingle, handleUploadError, async (req, res) => {
+// Create post with advanced features
+router.post("/", auth, uploadMultiple, handleUploadError, async (req, res) => {
   try {
-    const { caption, sport } = req.body;
-    
-    let mediaUrl = null;
-    let mediaType = null;
+    const { 
+      caption, 
+      sport, 
+      activityType, 
+      visibility, 
+      location, 
+      tags, 
+      mentions,
+      postType,
+      feeling,
+      withUsers 
+    } = req.body;
 
-    // Check if file was uploaded
-    if (req.file) {
-      mediaUrl = `/uploads/${req.file.filename}`;
-      
-      // Determine media type
-      if (req.file.mimetype.startsWith('image/')) {
-        mediaType = 'image';
-      } else if (req.file.mimetype.startsWith('video/')) {
-        mediaType = 'video';
-      }
-    }
+    // Process media files
+    const media = req.files?.map(file => ({
+      url: `/uploads/${file.filename}`,
+      mediaType: file.mimetype.startsWith('image/') ? 'image' : 
+                file.mimetype.startsWith('video/') ? 'video' : 'file',
+      thumbnail: file.mimetype.startsWith('video/') ? 
+                `/uploads/thumbnails/${file.filename}.jpg` : undefined
+    })) || [];
 
-    // Create new post
+    // Process mentions
+    const mentionIds = mentions ? JSON.parse(mentions) : [];
+    const withUserIds = withUsers ? JSON.parse(withUsers) : [];
+
+    // Create post
     const post = new Post({
       user: req.user.id,
-      caption: caption || "",
-      mediaUrl,
-      mediaType,
-      sport: sport || ""
+      caption,
+      media,
+      sport,
+      activityType: activityType || 'casual',
+      visibility: visibility || 'public',
+      location: location ? JSON.parse(location) : undefined,
+      tags: tags ? JSON.parse(tags) : [],
+      mentions: mentionIds,
+      postType: postType || 'normal',
+      feeling,
+      with: withUserIds
     });
 
     await post.save();
-    
-    // Populate user data for response
-    await post.populate('user', 'name username profilePicture');
+    await post.populate('user', 'name username profilePicture headline');
+    await post.populate('mentions', 'name username profilePicture');
+
+    // Update user's post count
+    await User.findByIdAndUpdate(req.user.id, { 
+      $inc: { postCount: 1 } 
+    });
+
+    // Create notifications for mentions
+    if (mentionIds.length > 0) {
+      const notificationPromises = mentionIds.map(mentionedUserId => 
+        new Notification({
+          user: mentionedUserId,
+          fromUser: req.user.id,
+          type: 'mention',
+          post: post._id,
+          message: `${req.user.name} mentioned you in a post`
+        }).save()
+      );
+      await Promise.all(notificationPromises);
+    }
 
     res.status(201).json({
       message: "Post created successfully",
       post
     });
+
   } catch (error) {
     console.error("Create post error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ 
+      error: "Failed to create post" 
+    });
   }
 });
 
-// Get all posts
-router.get("/", async (req, res) => {
+// Get feed with advanced algorithm
+router.get("/feed", auth, async (req, res) => {
   try {
-    const posts = await Post.find()
-      .populate('user', 'name username profilePicture')
-      .sort({ createdAt: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    res.json(posts);
+    const user = await User.findById(req.user.id);
+    
+    // Build feed query based on user preferences and relationships
+    const feedQuery = {
+      $or: [
+        // Posts from followed users
+        { user: { $in: user.following } },
+        // Posts in user's favorite sports
+        { sport: { $in: user.favoriteSports } },
+        // Popular posts (high engagement)
+        { 
+          $expr: { 
+            $gt: [
+              { $add: ["$likesCount", "$commentsCount", "$sharesCount"] }, 
+              10
+            ] 
+          } 
+        }
+      ],
+      visibility: { $in: ['public', 'friends'] }
+    };
+
+    const posts = await Post.find(feedQuery)
+      .populate('user', 'name username profilePicture headline followersCount')
+      .populate('mentions', 'name username profilePicture')
+      .sort({ 
+        // Score based on recency and engagement
+        createdAt: -1 
+      })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Add engagement status for current user
+    const postsWithEngagement = posts.map(post => ({
+      ...post,
+      isLiked: post.likes?.includes(req.user.id) || false,
+      isSaved: post.saves?.includes(req.user.id) || false
+    }));
+
+    res.json({
+      posts: postsWithEngagement,
+      pagination: {
+        page,
+        limit,
+        hasMore: posts.length === limit
+      }
+    });
+
   } catch (error) {
-    console.error("Get posts error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Feed error:", error);
+    res.status(500).json({ 
+      error: "Failed to fetch feed" 
+    });
   }
 });
 
-// Get posts by user
-router.get("/user/:userId", async (req, res) => {
+// Advanced search with filters
+router.get("/search", async (req, res) => {
   try {
-    const posts = await Post.find({ user: req.params.userId })
-      .populate('user', 'name username profilePicture')
-      .sort({ createdAt: -1 });
+    const { q, sport, type, location, user } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
 
-    res.json(posts);
-  } catch (error) {
-    console.error("Get user posts error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+    let query = {};
 
-// Get single post by ID
-router.get("/:postId", async (req, res) => {
-  try {
-    const post = await Post.findById(req.params.postId)
-      .populate('user', 'name username profilePicture');
-
-    if (!post) {
-      return res.status(404).json({ error: "Post not found" });
+    // Text search
+    if (q) {
+      query.$text = { $search: q };
     }
 
-    res.json(post);
+    // Filters
+    if (sport) query.sport = sport;
+    if (type) query.activityType = type;
+    if (user) query.user = user;
+
+    const posts = await Post.find(query)
+      .populate('user', 'name username profilePicture')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Post.countDocuments(query);
+
+    res.json({
+      posts,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+
   } catch (error) {
-    console.error("Get post error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Search error:", error);
+    res.status(500).json({ 
+      error: "Search failed" 
+    });
   }
 });
 
-// Delete a post
-router.delete("/:postId", auth, async (req, res) => {
+// Save/Unsave post
+router.post("/:postId/save", auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
-
+    
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
 
-    // Check if user owns the post
-    if (post.user.toString() !== req.user.id) {
-      return res.status(403).json({ error: "Not authorized to delete this post" });
+    const isSaved = post.saves.includes(req.user.id);
+    
+    if (isSaved) {
+      // Unsaved
+      await Post.findByIdAndUpdate(req.params.postId, {
+        $pull: { saves: req.user.id }
+      });
+      res.json({ message: "Post unsaved", saved: false });
+    } else {
+      // Save
+      await Post.findByIdAndUpdate(req.params.postId, {
+        $addToSet: { saves: req.user.id }
+      });
+      res.json({ message: "Post saved", saved: true });
     }
 
-    await Post.findByIdAndDelete(req.params.postId);
-
-    res.json({ message: "Post deleted successfully" });
   } catch (error) {
-    console.error("Delete post error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Save post error:", error);
+    res.status(500).json({ 
+      error: "Failed to save post" 
+    });
   }
 });
 

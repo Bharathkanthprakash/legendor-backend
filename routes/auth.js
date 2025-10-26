@@ -7,7 +7,7 @@ import { sendVerificationEmail } from "../utils/emailService.js";
 
 const router = express.Router();
 
-// Register
+// Register with email verification
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password, username } = req.body;
@@ -78,7 +78,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// Login
+// Login (requires email verification)
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -98,7 +98,7 @@ router.post("/login", async (req, res) => {
     // Check if email is verified
     if (!user.isVerified) {
       return res.status(400).json({ 
-        error: "Please verify your email before logging in" 
+        error: "Please verify your email before logging in. Check your email for verification link." 
       });
     }
 
@@ -217,7 +217,7 @@ router.get("/verify-email/:token", async (req, res) => {
   }
 });
 
-// Resend verification email (without auth for users who didn't receive it)
+// Resend verification email
 router.post("/resend-verification", async (req, res) => {
   try {
     const { email } = req.body;

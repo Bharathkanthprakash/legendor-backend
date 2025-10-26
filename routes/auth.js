@@ -21,6 +21,8 @@ router.post("/signup", async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Signup failed" });
   }
+  POST /api/auth/send-verification
+POST /api/auth/verify-email/:token
 });
 
 // Login

@@ -16,6 +16,9 @@ const userSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
+  isVerified: { type: Boolean, default: false },
+  verificationToken: String,
+  verificationExpires: Date
 });
 
 export default mongoose.model("User", userSchema);

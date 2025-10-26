@@ -45,6 +45,9 @@ mongoose.connect(process.env.MONGO_URL)
 app.use("/api/auth", authRoutes);
 app.use("/api/profiles", profileRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/posts", likeRoutes);
+app.use("/api/posts", commentRoutes);
+app.use("/api/shares", shareRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
@@ -63,7 +66,10 @@ app.get("/", (req, res) => {
       health: "/health",
       auth: "/api/auth",
       profiles: "/api/profiles",
-      posts: "/api/posts"
+      posts: "/api/posts",
+       likes: "/api/posts/:postId/like",
+      comments: "/api/posts/:postId/comments",
+      shares: "/api/shares"
     }
   });
 });

@@ -1,15 +1,15 @@
-const express = require('express');
+import express from "express";
+import Share from "../models/Share.js";
+import Post from "../models/Post.js";
+import auth from "../middleware/auth.js";
+
 const router = express.Router();
-const Share = require('../models/Share');
-const Post = require('../models/Post');
-const auth = require('../middleware/auth');
 
 // Share a post
-router.post('/', auth, async (req, res) => {
+router.post("/", auth, async (req, res) => {
   try {
     const { originalPost, caption } = req.body;
     
-    // Create a new post for the shared content
     const sharedPost = new Post({
       user: req.user.id,
       caption: caption,
@@ -19,7 +19,6 @@ router.post('/', auth, async (req, res) => {
     
     await sharedPost.save();
     
-    // Create share record
     const share = new Share({
       user: req.user.id,
       originalPost: originalPost,
@@ -37,10 +36,10 @@ router.post('/', auth, async (req, res) => {
 });
 
 // Get shares for a post
-router.get('/post/:postId', async (req, res) => {
+router.get("/post/:postId", async (req, res) => {
   try {
     const shares = await Share.find({ originalPost: req.params.postId })
-      .populate('user', 'name username profilePicture');
+      .populate("user", "name username profilePicture");
     
     res.json(shares);
   } catch (error) {
@@ -48,4 +47,4 @@ router.get('/post/:postId', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

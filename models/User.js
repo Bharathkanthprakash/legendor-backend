@@ -1,70 +1,47 @@
-import mongoose from "mongoose";
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  // Basic Info
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  username: { type: String, unique: true, sparse: true },
-  password: { type: String, required: true },
-  
-  // Profile
-  profilePicture: { type: String, default: "" },
-  coverPhoto: { type: String, default: "" },
-  bio: { type: String, default: "" },
-  location: { type: String, default: "" },
-  website: { type: String, default: "" },
-  
-  // Professional Info (LinkedIn-like)
-  headline: { type: String, default: "" },
-  currentPosition: { type: String, default: "" },
-  education: [{
-    school: String,
-    degree: String,
-    field: String,
-    startYear: Number,
-    endYear: Number
-  }],
-  skills: [String],
-  
-  // Social Features
-  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  
-  // Preferences
-  sports: [{
-    name: String,
-    category: String,
-    skillLevel: { 
-      type: String, 
-      enum: ['Beginner', 'Intermediate', 'Advanced', 'Professional'],
-      default: 'Beginner'
-    }
-  }],
-  favoriteSports: [String],
-  notifications: {
-    email: { type: Boolean, default: true },
-    push: { type: Boolean, default: true }
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    minlength: 3,
+    maxlength: 30
   },
-  
-  // Verification & Security
-  isVerified: { type: Boolean, default: false },
-  verificationToken: String,
-  verificationExpires: Date,
-  isActive: { type: Boolean, default: true },
-  
-  // Stats
-  postCount: { type: Number, default: 0 },
-  followerCount: { type: Number, default: 0 },
-  followingCount: { type: Number, default: 0 },
-  
-  // Timestamps
-  lastActive: { type: Date, default: Date.now }
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 6
+  }
 }, {
   timestamps: true
 });
 
-// Index for search
-userSchema.index({ name: 'text', username: 'text', headline: 'text' });
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
-export default mongoose.model("User", userSchema);
+// Compare password method
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
+module.exports = mongoose.model('User', userSchema);
